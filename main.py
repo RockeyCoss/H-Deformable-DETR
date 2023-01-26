@@ -158,6 +158,10 @@ def get_args_parser():
     # hybrid branch
     parser.add_argument("--k_one2many", default=5, type=int)
     parser.add_argument("--lambda_one2many", default=1.0, type=float)
+    # shift attention
+    parser.add_argument("--with_shift_attn", action="store_true", default=False)
+    parser.add_argument("--shift_scheme", default='interleave')
+
 
     # * Segmentation
     parser.add_argument(

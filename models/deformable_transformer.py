@@ -21,6 +21,7 @@ from torch import nn, Tensor
 import torch.utils.checkpoint as checkpoint
 from torch.nn.init import xavier_uniform_, constant_, uniform_, normal_
 
+from models.shift_attention import WindowShiftAttention
 from util.misc import inverse_sigmoid
 from models.ops.modules import MSDeformAttn
 
@@ -44,6 +45,9 @@ class DeformableTransformer(nn.Module):
         look_forward_twice=False,
         mixed_selection=False,
         use_checkpoint=False,
+        window_size=300,
+        with_shift_attn=True,
+        shift_scheme='interleave'
     ):
         super().__init__()
 
@@ -73,6 +77,9 @@ class DeformableTransformer(nn.Module):
             num_feature_levels,
             nhead,
             dec_n_points,
+            window_size,
+            with_shift_attn,
+            shift_scheme
         )
         self.decoder = DeformableTransformerDecoder(
             decoder_layer,
@@ -427,6 +434,9 @@ class DeformableTransformerDecoderLayer(nn.Module):
         n_levels=4,
         n_heads=8,
         n_points=4,
+        window_size=300,
+        with_shift_attn=True,
+        shift_scheme='interleave'
     ):
         super().__init__()
 
@@ -436,7 +446,12 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.norm1 = nn.LayerNorm(d_model)
 
         # self attention
-        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
+        self.self_attn = WindowShiftAttention(embed_dim=d_model,
+                                              num_heads=n_heads,
+                                              window_size=window_size,
+                                              with_shift_attn=with_shift_attn,
+                                              shift_scheme=shift_scheme,
+                                              dropout=dropout)
         self.dropout2 = nn.Dropout(dropout)
         self.norm2 = nn.LayerNorm(d_model)
 
@@ -471,13 +486,14 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self_attn_mask=None,
     ):
         # self attention
-        q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(
-            q.transpose(0, 1),
-            k.transpose(0, 1),
-            tgt.transpose(0, 1),
-            attn_mask=self_attn_mask,
-        )[0].transpose(0, 1)
+        # q = k = self.with_pos_embed(tgt, query_pos)
+        # tgt2 = self.self_attn(
+        #     q.transpose(0, 1),
+        #     k.transpose(0, 1),
+        #     tgt.transpose(0, 1),
+        #     attn_mask=self_attn_mask,
+        # )[0].transpose(0, 1)
+        tgt2 = self.self_attn(tgt, query_pos)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
@@ -632,5 +648,8 @@ def build_deforamble_transformer(args):
         mixed_selection=args.mixed_selection,
         look_forward_twice=args.look_forward_twice,
         use_checkpoint=args.use_checkpoint,
+        window_size=args.num_queries_one2one,
+        with_shift_attn=args.with_shift_attn,
+        shift_scheme=args.shift_scheme
     )
 
