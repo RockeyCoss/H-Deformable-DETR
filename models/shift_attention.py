@@ -100,7 +100,7 @@ class WindowShiftAttention(nn.Module):
         # B,L,C
         query = self.windows_reverse(q, L)
 
-        if self.with_shift_attn:
+        if self.with_shift_attn and query.size(1) > self.window_size:
             one2many_q = query[:, self.window_size:]
             one2many_q_pos = query_pos[:, self.window_size:]
             B, L, C = one2many_q.shape

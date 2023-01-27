@@ -2,3 +2,4 @@ models/ops/MultiScaleDeformableAttention.egg-info
 amlt
 exps
 .idea
+*/__pycache__
