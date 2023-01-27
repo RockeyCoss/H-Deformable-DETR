@@ -21,7 +21,7 @@ from torch import nn, Tensor
 import torch.utils.checkpoint as checkpoint
 from torch.nn.init import xavier_uniform_, constant_, uniform_, normal_
 
-from models.shift_attention import WindowShiftAttention
+from models.window_attention import WindowShiftAttention
 from util.misc import inverse_sigmoid
 from models.ops.modules import MSDeformAttn
 
