@@ -22,6 +22,7 @@ import torch.utils.checkpoint as checkpoint
 from torch.nn.init import xavier_uniform_, constant_, uniform_, normal_
 
 from models.window_attention import WindowShiftAttention
+from models.window_attention2 import WindowShiftAttention2
 from util.misc import inverse_sigmoid
 from models.ops.modules import MSDeformAttn
 
@@ -446,12 +447,11 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.norm1 = nn.LayerNorm(d_model)
 
         # self attention
-        self.self_attn = WindowShiftAttention(embed_dim=d_model,
-                                              num_heads=n_heads,
-                                              window_size=window_size,
-                                              with_shift_attn=with_shift_attn,
-                                              shift_scheme=shift_scheme,
-                                              dropout=dropout)
+        self.self_attn = WindowShiftAttention2(embed_dim=d_model,
+                                               num_heads=n_heads,
+                                               window_size=window_size,
+                                               shift_scheme=shift_scheme,
+                                               dropout=dropout)
         self.dropout2 = nn.Dropout(dropout)
         self.norm2 = nn.LayerNorm(d_model)
 
@@ -475,15 +475,16 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
     @torch.cuda.amp.custom_fwd(cast_inputs=torch.float32)
     def forward(
-        self,
-        tgt,
-        query_pos,
-        reference_points,
-        src,
-        src_spatial_shapes,
-        level_start_index,
-        src_padding_mask=None,
-        self_attn_mask=None,
+            self,
+            tgt,
+            query_pos,
+            reference_points,
+            src,
+            src_spatial_shapes,
+            level_start_index,
+            src_padding_mask=None,
+            self_attn_mask=None,
+            idx=0
     ):
         # self attention
         # q = k = self.with_pos_embed(tgt, query_pos)
@@ -493,7 +494,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         #     tgt.transpose(0, 1),
         #     attn_mask=self_attn_mask,
         # )[0].transpose(0, 1)
-        tgt2 = self.self_attn(tgt, query_pos)
+        tgt2 = self.self_attn(tgt, query_pos, idx % 2 != 0)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
@@ -573,6 +574,7 @@ class DeformableTransformerDecoder(nn.Module):
                     src_level_start_index,
                     src_padding_mask,
                     self_attn_mask,
+                    lid
                 )
             else:
                 output = layer(
@@ -584,6 +586,7 @@ class DeformableTransformerDecoder(nn.Module):
                     src_level_start_index,
                     src_padding_mask,
                     self_attn_mask,
+                    lid
                 )
 
             # hack implementation for iterative bounding box refinement
